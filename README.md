@@ -1,30 +1,44 @@
+# curl2vRO
 
-
-
-          
-# curl2vRO - Curl to vRealize Orchestrator REST API Converter
-
+[![npm version](https://img.shields.io/npm/v/curl2vro.svg)](https://www.npmjs.com/package/curl2vro)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Downloads](https://img.shields.io/npm/dm/curl2vro.svg)](https://www.npmjs.com/package/curl2vro)
 
-A Node.js utility to convert curl commands to VMware vRealize Orchestrator (vRO) JavaScript code. This tool simplifies the process of creating REST API calls in vRO by automatically generating the necessary JavaScript code from curl commands.
+A utility to convert curl commands to VMware vRealize Orchestrator (vRO) JavaScript code.
+
+## Requirements
+
+- Node.js 12.x or higher
+- VMware vRealize Orchestrator environment for running the generated code
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [Features](#features)
+- [Examples](#examples)
+  - [Basic GET Request](#basic-get-request)
+  - [POST Request with JSON Body](#post-request-with-json-body)
+  - [PUT Request with Authentication](#put-request-with-authentication)
+  - [DELETE Request](#delete-request)
+  - [Request with Query Parameters](#request-with-query-parameters)
+- [API Reference](#api-reference)
+- [Supported Curl Features](#supported-curl-features)
+- [License](#license)
+- [Author](#author)
+- [Contributing](#contributing)
+- [Development](#development)
 
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/curl2vRO.git
-
-# Navigate to the project directory
-cd curl2vRO
-
-# Install dependencies (if any)
-npm install
+npm install curl2vro
 ```
 
 ## Usage
 
 ```javascript
-const curl2vRO = require('./curl2vRO');
+const curl2vRO = require('curl2vRO');
 
 // Your curl command
 const curlCommand = `curl https://api.example.com/data`;
@@ -396,3 +410,19 @@ Email: mayankgoyalmax@gmail.com
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Development
+
+To set up the development environment:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/curl2vro.git
+
+# Install dependencies
+cd curl2vro
+npm install
+
+# Run tests
+npm test
+```
