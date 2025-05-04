@@ -147,9 +147,9 @@ function generateVROCode(parsedCurl, originalCurlCommand) {
     // Get current date for JSDoc
     const currentDate = new Date().toISOString().split('T')[0];
     
-    // Add JSDoc header to the generated code
+    // Add JSDoc header to the generated code with improved description
     let vroCode = `/**
- * @description Curl to vRO JavaScript converted code
+ * @description Makes a ${method} REST call to ${url}
  * @author curl2vRO
  * @version 1.0.0
  * @date ${currentDate}
@@ -212,22 +212,34 @@ if (response.statusCode == 200) {
  * Converts a curl command to vRO JavaScript code and saves it to a file
  * @param {string} curlCommand - The curl command to convert
  * @returns {string} The generated vRO JavaScript code
+ * @throws {Error} If the curl command cannot be parsed properly
  */
 function convertCurlToVRO(curlCommand) {
-    const parsedCurl = parseCurlCommand(curlCommand);
-    const vroCode = generateVROCode(parsedCurl, curlCommand);
-    
-    // Generate filename from URL and method
-    const urlObj = new URL(parsedCurl.url);
-    const sanitizedPath = urlObj.pathname.replace(/[\/:\*?"<>|]/g, '_');
-    const filename = `${urlObj.hostname}${sanitizedPath}_${parsedCurl.method}.js`;
-    
-    // Write to file using Node.js fs module
-    const fs = require('fs');
-    fs.writeFileSync(filename, vroCode);
-    console.log(`vRO code has been saved to ${filename}`);
-    
-    return vroCode;
+    try {
+        const parsedCurl = parseCurlCommand(curlCommand);
+        
+        // Validate that we have a valid URL
+        if (!parsedCurl.url) {
+            throw new Error("URL not found in curl command");
+        }
+        
+        const vroCode = generateVROCode(parsedCurl, curlCommand);
+        
+        // Generate filename from URL and method
+        const urlObj = new URL(parsedCurl.url);
+        const sanitizedPath = urlObj.pathname.replace(/[\/:\*?"<>|]/g, '_');
+        const filename = `${urlObj.hostname}${sanitizedPath}_${parsedCurl.method}.js`;
+        
+        // Write to file using Node.js fs module
+        const fs = require('fs');
+        fs.writeFileSync(filename, vroCode);
+        console.log(`vRO code has been saved to ${filename}`);
+        
+        return vroCode;
+    } catch (error) {
+        console.error("Error:", error.message);
+        throw new Error("Unsupported curl command. Curl2vRO fails to parse it properly. Please check the command.");
+    }
 }
 
 // Export the module with the new name
