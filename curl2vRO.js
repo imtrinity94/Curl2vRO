@@ -15,14 +15,39 @@
  * @returns {Object} An object containing the parsed components (url, method, headers, data)
  */
 function parseCurlCommand(curlCommand) {
-    // Enhanced URL regex to handle various curl command formats including http requests
-    const urlRegex = /curl\s+(?:(?:-X\s+\w+\s+)|(?:--request\s+\w+\s+)|(?:--location\s+)|(?:-L\s+))?['"]?((?:https?|http):\/\/[^'""\s]+)['"]?/;
+    // Enhanced URL regex to handle various curl command formats
+    const urlRegex = /curl\s+(?:(?:-X\s+\w+\s+)|(?:--request\s+\w+\s+)|(?:--location\s+)|(?:-L\s+)|(?:--url\s+))?['"]?((?:https?|http):\/\/[^'""\s]+)['"]?/;
     const urlMatch = curlCommand.match(urlRegex);
     
-    const methodMatch = curlCommand.match(/-X\s+([A-Z]+)/i);
-    // Updated header regex to match both -H and --header formats
-    const headerMatches = curlCommand.match(/(?:-H|--header)\s+['"]([^'"]+)['"]/g);
-    const dataMatch = curlCommand.match(/-d\s+['"]({[\s\S]*?})['"]/);
+    // Method detection - support both -X and --request formats
+    const methodMatch = curlCommand.match(/(?:-X|--request)\s+([A-Z]+)/i);
+    
+    // Header detection - support -H, --header, and variations with single/double quotes
+    const headerMatches = curlCommand.match(/(?:-H|--header)\s+(['"])([^\1]+?)\1/g) || 
+                          curlCommand.match(/(?:-H|--header)\s+([^'\s"][^\s]*)/g);
+    
+    // Data detection - support multiple formats:
+    // -d, --data, --data-raw, --data-binary, --data-urlencode with quotes or without
+    const dataRegexes = [
+        /-d\s+(['"])({[\s\S]*?})\1/,                  // -d '{"json":"data"}'
+        /--data\s+(['"])({[\s\S]*?})\1/,              // --data '{"json":"data"}'
+        /--data-raw\s+(['"])({[\s\S]*?})\1/,          // --data-raw '{"json":"data"}'
+        /--data-binary\s+(['"])({[\s\S]*?})\1/,       // --data-binary '{"json":"data"}'
+        /-d\s+(['"])([\s\S]*?)\1/,                    // -d 'any data'
+        /--data\s+(['"])([\s\S]*?)\1/,                // --data 'any data'
+        /--data-raw\s+(['"])([\s\S]*?)\1/,            // --data-raw 'any data'
+        /--data-binary\s+(['"])([\s\S]*?)\1/,         // --data-binary 'any data'
+        /--data-urlencode\s+(['"])([\s\S]*?)\1/       // --data-urlencode 'name=value'
+    ];
+    
+    let dataMatch = null;
+    for (const regex of dataRegexes) {
+        const match = curlCommand.match(regex);
+        if (match) {
+            dataMatch = match;
+            break;
+        }
+    }
 
     // Extract components
     const url = urlMatch ? (urlMatch[1] || urlMatch[2]) : '';
@@ -32,7 +57,7 @@ function parseCurlCommand(curlCommand) {
     
     // If there's request data but no explicit method, assume POST
     if (dataMatch) {
-        data = dataMatch[1];
+        data = dataMatch[2];
         if (!methodMatch) {
             method = 'POST';
         }
@@ -41,11 +66,54 @@ function parseCurlCommand(curlCommand) {
     // Parse headers
     if (headerMatches) {
         headerMatches.forEach(header => {
-            // Updated regex to match both -H and --header formats
-            const headerContent = header.match(/(?:-H|--header)\s+['"]([^'"]+)['"]/)[1];
-            const [key, value] = headerContent.split(':').map(s => s.trim());
-            headers[key] = value;
+            // Extract header content from quotes if present
+            let headerContent;
+            const quotedMatch = header.match(/(?:-H|--header)\s+(['"])([^\1]+?)\1/);
+            if (quotedMatch) {
+                headerContent = quotedMatch[2];
+            } else {
+                const unquotedMatch = header.match(/(?:-H|--header)\s+([^'\s"][^\s]*)/);
+                headerContent = unquotedMatch ? unquotedMatch[1] : '';
+            }
+            
+            // Split into key-value if we have a valid header
+            if (headerContent && headerContent.includes(':')) {
+                const [key, ...valueParts] = headerContent.split(':');
+                const value = valueParts.join(':').trim(); // Rejoin in case value contains colons
+                headers[key.trim()] = value;
+            }
         });
+    }
+
+    // Handle authentication with -u or --user
+    const authMatch = curlCommand.match(/(?:-u|--user)\s+(['"]?)([^'"]+?)\1/);
+    if (authMatch && authMatch[2].includes(':')) {
+        const [username, password] = authMatch[2].split(':');
+        headers['Authorization'] = 'Basic ' + Buffer.from(username + ':' + password).toString('base64');
+    }
+
+    // Handle form data with --form or -F
+    const formMatches = curlCommand.match(/(?:--form|-F)\s+(['"]?)([^'"]+?)\1/g);
+    if (formMatches && !dataMatch) {
+        const formData = {};
+        formMatches.forEach(formPart => {
+            const match = formPart.match(/(?:--form|-F)\s+(['"]?)([^'"]+?)\1/);
+            if (match && match[2].includes('=')) {
+                const [key, value] = match[2].split('=');
+                formData[key.trim()] = value.trim();
+            }
+        });
+        
+        if (Object.keys(formData).length > 0) {
+            data = JSON.stringify(formData);
+            if (!methodMatch) {
+                method = 'POST';
+            }
+            // Set content-type if not already set
+            if (!headers['Content-Type']) {
+                headers['Content-Type'] = 'application/x-www-form-urlencoded';
+            }
+        }
     }
 
     return { url, method, headers, data };
