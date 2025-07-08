@@ -3,13 +3,15 @@
 [![npm version](https://img.shields.io/npm/v/curl2vro.svg)](https://www.npmjs.com/package/curl2vro)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Downloads](https://img.shields.io/npm/dm/curl2vro.svg)](https://www.npmjs.com/package/curl2vro)
+[![GitHub stars](https://img.shields.io/github/stars/imtrinity94/Curl2vRO?style=social)](https://github.com/imtrinity94/Curl2vRO/stargazers)
 
 A utility to convert curl commands to VMware vRealize Orchestrator (vRO) JavaScript code.
 
 ## Requirements
 
-- Node.js 12.x or higher
+- Node.js 14.x or higher
 - VMware vRealize Orchestrator environment for running the generated code
+- npm 6.x or higher
 
 ## Table of Contents
 
@@ -71,9 +73,7 @@ const curlCommand = `curl -X GET https://api.sampleapis.com/coffee/hot`;
 // Output
 /**
  * @description Curl to vRO JavaScript converted code
- * @author curl2vRO
- * @version 1.0.0
- * @date 2025-05-15
+ * @author curl2vRO (Mayank Goyal)
  */
 
 // Accept SSL certificate
@@ -124,9 +124,7 @@ const curlCommand = `curl -X POST https://api.example.com/users \
 // Output
 /**
  * @description Curl to vRO JavaScript converted code
- * @author curl2vRO
- * @version 1.0.0
- * @date 2025-05-15
+ * @author curl2vRO (Mayank Goyal)
  */
 
 // Accept SSL certificate
@@ -188,9 +186,7 @@ const curlCommand = `curl --location --request PUT 'https://api.example.com/reso
 // Output
 /**
  * @description Curl to vRO JavaScript converted code
- * @author curl2vRO
- * @version 1.0.0
- * @date 2025-05-15
+ * @author curl2vRO (Mayank Goyal)
  */
 
 // Accept SSL certificate
@@ -254,9 +250,7 @@ const curlCommand = `curl -X DELETE https://api.example.com/users/123 \
 // Output
 /**
  * @description Curl to vRO JavaScript converted code
- * @author curl2vRO
- * @version 1.0.0
- * @date 2025-05-15
+ * @author curl2vRO (Mayank Goyal)
  */
 
 // Accept SSL certificate
@@ -309,9 +303,7 @@ const curlCommand = `curl "https://api.example.com/search?q=test&limit=10" \
 // Output
 /**
  * @description Curl to vRO JavaScript converted code
- * @author curl2vRO
- * @version 1.0.0
- * @date 2025-05-15
+ * @author curl2vRO (Mayank Goyal)
  */
 
 // Accept SSL certificate

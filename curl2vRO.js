@@ -1,191 +1,192 @@
 /**
  * @module Curl2vRO
  * @requires fs
- * @fileoverview Curl to vRO REST API Converter
+ * @requires curl-to-postmanv2
+ * @requires deasync
+ * @fileoverview Curl to vRO JavaScript Code Converter
  * @description A utility to convert curl commands to VMware vRealize Orchestrator (vRO) JavaScript code
  * @author Mayank Goyal <mayankgoyalmax@gmail.com>
- * @version 1.0.5
+ * @version 2.0.0
  * @license MIT
- * @website https://cloudblogger.co.in
  */
 
-/**
- * Parses a curl command and extracts its components
- * @param {string} curlCommand - The curl command to parse
- * @returns {Object} An object containing the parsed components (url, method, headers, data)
- */
-function parseCurlCommand(curlCommand) {
-    // Enhanced URL regex to handle various curl command formats
-    const urlRegex = /curl\s+(?:(?:-X\s+\w+\s+)|(?:--request\s+\w+\s+)|(?:--location\s+)|(?:-L\s+)|(?:--url\s+))?['"]?((?:https?|http):\/\/[^'""\s]+)['"]?/;
-    const urlMatch = curlCommand.match(urlRegex);
+const { validate, convert } = require('curl-to-postmanv2');
+const fs = require('fs');
+const deasync = require('deasync');
+
+// Create a synchronous version of the convert function
+function convertSync(curlCommand) {
+    let done = false;
+    let result = null;
+    let error = null;
     
-    // Method detection - support both -X and --request formats
-    const methodMatch = curlCommand.match(/(?:-X|--request)\s+([A-Z]+)/i);
-    
-    // Header detection - support -H, --header, and variations with single/double quotes
-    const headerMatches = curlCommand.match(/(?:-H|--header)\s+(['"])([^\1]+?)\1/g) || 
-                          curlCommand.match(/(?:-H|--header)\s+([^'\s"][^\s]*)/g);
-    
-    // Data detection - support multiple formats:
-    // -d, --data, --data-raw, --data-binary, --data-urlencode with quotes or without
-    const dataRegexes = [
-        /-d\s+(['"])({[\s\S]*?})\1/,                  // -d '{"json":"data"}'
-        /--data\s+(['"])({[\s\S]*?})\1/,              // --data '{"json":"data"}'
-        /--data-raw\s+(['"])({[\s\S]*?})\1/,          // --data-raw '{"json":"data"}'
-        /--data-binary\s+(['"])({[\s\S]*?})\1/,       // --data-binary '{"json":"data"}'
-        /-d\s+(['"])([\s\S]*?)\1/,                    // -d 'any data'
-        /--data\s+(['"])([\s\S]*?)\1/,                // --data 'any data'
-        /--data-raw\s+(['"])([\s\S]*?)\1/,            // --data-raw 'any data'
-        /--data-binary\s+(['"])([\s\S]*?)\1/,         // --data-binary 'any data'
-        /--data-urlencode\s+(['"])([\s\S]*?)\1/       // --data-urlencode 'name=value'
-    ];
-    
-    let dataMatch = null;
-    for (const regex of dataRegexes) {
-        const match = curlCommand.match(regex);
-        if (match) {
-            dataMatch = match;
-            break;
+    convert({ type: 'string', data: curlCommand }, (err, res) => {
+        if (err) {
+            error = err;
+        } else {
+            result = res;
         }
-    }
-
-    // Extract components
-    const url = urlMatch ? (urlMatch[1] || urlMatch[2]) : '';
-    let method = methodMatch ? methodMatch[1].toUpperCase() : 'GET';
-    const headers = {};
-    let data = null;
+        done = true;
+    });
     
-    // If there's request data but no explicit method, assume POST
-    if (dataMatch) {
-        data = dataMatch[2];
-        if (!methodMatch) {
-            method = 'POST';
-        }
-    }
-
-    // Parse headers
-    if (headerMatches) {
-        headerMatches.forEach(header => {
-            // Extract header content from quotes if present
-            let headerContent;
-            const quotedMatch = header.match(/(?:-H|--header)\s+(['"])([^\1]+?)\1/);
-            if (quotedMatch) {
-                headerContent = quotedMatch[2];
-            } else {
-                const unquotedMatch = header.match(/(?:-H|--header)\s+([^'\s"][^\s]*)/);
-                headerContent = unquotedMatch ? unquotedMatch[1] : '';
-            }
-            
-            // Split into key-value if we have a valid header
-            if (headerContent && headerContent.includes(':')) {
-                const [key, ...valueParts] = headerContent.split(':');
-                const value = valueParts.join(':').trim(); // Rejoin in case value contains colons
-                headers[key.trim()] = value;
-            }
-        });
-    }
-
-    // Handle authentication with -u or --user
-    const authMatch = curlCommand.match(/(?:-u|--user)\s+(['"]?)([^'"]+?)\1/);
-    if (authMatch && authMatch[2].includes(':')) {
-        const [username, password] = authMatch[2].split(':');
-        headers['Authorization'] = 'Basic ' + Buffer.from(username + ':' + password).toString('base64');
-    }
-
-    // Handle form data with --form or -F
-    const formMatches = curlCommand.match(/(?:--form|-F)\s+(['"]?)([^'"]+?)\1/g);
-    if (formMatches && !dataMatch) {
-        const formData = {};
-        formMatches.forEach(formPart => {
-            const match = formPart.match(/(?:--form|-F)\s+(['"]?)([^'"]+?)\1/);
-            if (match && match[2].includes('=')) {
-                const [key, value] = match[2].split('=');
-                formData[key.trim()] = value.trim();
-            }
-        });
-        
-        if (Object.keys(formData).length > 0) {
-            data = JSON.stringify(formData);
-            if (!methodMatch) {
-                method = 'POST';
-            }
-            // Set content-type if not already set
-            if (!headers['Content-Type']) {
-                headers['Content-Type'] = 'application/x-www-form-urlencoded';
-            }
-        }
-    }
-
-    return { url, method, headers, data };
+    // Wait synchronously for the async operation to complete
+    deasync.loopWhile(() => !done);
+    
+    if (error) throw error;
+    return result;
 }
 
 /**
- * Generates vRO JavaScript code from parsed curl command components
- * @param {Object} parsedCurl - The parsed curl command components
- * @param {string} parsedCurl.url - The URL from the curl command
- * @param {string} parsedCurl.method - The HTTP method (GET, POST, etc.)
- * @param {Object} parsedCurl.headers - The HTTP headers as key-value pairs
- * @param {string|null} parsedCurl.data - The request body data (if any)
- * @param {string} originalCurlCommand - The original curl command for reference
+ * Converts a Postman request object to vRO JavaScript code
+ * @param {Object} postmanRequest - The Postman request object
+ * @param {string} originalCurl - The original curl command for reference
  * @returns {string} The generated vRO JavaScript code
  */
-function generateVROCode(parsedCurl, originalCurlCommand) {
-    const { url, method, headers, data } = parsedCurl;
-    
-    if (!url) {
-        throw new Error('URL is required in the curl command');
+function generateVROCode(postmanRequest, originalCurl) {
+    if (!postmanRequest || !postmanRequest.url) {
+        throw new Error('Invalid Postman request object');
     }
 
-    // Handle URL parsing more safely
+    const method = postmanRequest.method || 'GET';
+    const url = typeof postmanRequest.url === 'string' 
+        ? postmanRequest.url 
+        : (postmanRequest.url.raw || '');
+
+    if (!url) {
+        throw new Error('No URL found in the request');
+    }
+
+    // Parse URL to extract components
     let urlObj;
-    try {
-        urlObj = new URL(url);
-    } catch (error) {
-        throw new Error('Invalid URL format in curl command');
+    let urlToProcess = url;
+    
+    // Add https:// if no protocol (http:// or https://) is specified
+    if (!/^https?:\/\//i.test(urlToProcess)) {
+        urlToProcess = 'https://' + urlToProcess;
     }
     
+    try {
+        urlObj = new URL(urlToProcess);
+    } catch (e) {
+        throw new Error(`Invalid URL format: ${url}`);
+    }
+
     // Get current date for JSDoc
     const currentDate = new Date().toISOString().split('T')[0];
     
-    // Add JSDoc header to the generated code with improved description
+    // Start building the vRO code
     let vroCode = `/**
  * @description Makes a ${method} REST call to ${url}
- * @author curl2vRO
- * @version 1.0.0
- * @date ${currentDate}
+ * @author curl2vRO (Mayank Goyal)
  */
 
 // Accept SSL certificate
 var ld = Config.getKeystores().getImportCAFromUrlAction();
 var model = ld.getModel();
-model.value = "${url}";
+model.value = "${urlObj.protocol}//${urlObj.host}";
 var error = ld.execute();
 if (error) {
-    throw new Error("Failed to accept certificate for URL: " + "${url}" + ". Error: " + error);
+    throw new Error("Failed to accept certificate for URL: ${urlObj.protocol}//${urlObj.host}" + ". Error: " + error);
 }
 
 // Create transient REST host
 var restHost = RESTHostManager.createHost("dynamicRequest");
 var httpRestHost = RESTHostManager.createTransientHostFrom(restHost);
 httpRestHost.operationTimeout = 600;
-httpRestHost.url = "${urlObj.origin}";
+httpRestHost.url = "${urlObj.protocol}//${urlObj.host}";
 
 // Create REST request
-var request = httpRestHost.createRequest("${method}", "${urlObj.pathname}${urlObj.search}", `;
-
-    // Add request body if present
-    if (data) {
-        vroCode += `JSON.stringify(${data}));\n`;
-    } else {
-        vroCode += `null);\n`;
-    }
+var request = httpRestHost.createRequest("${method.toUpperCase()}", "${urlObj.pathname}${urlObj.search || ''}");
+`;
 
     // Add headers
-    if (Object.keys(headers).length > 0) {
+    const headers = postmanRequest.header || [];
+    if (headers.length > 0) {
         vroCode += '\n// Add headers\n';
-        Object.entries(headers).forEach(([key, value]) => {
-            vroCode += `request.setHeader("${key}", "${value}");\n`;
+        headers.forEach(h => {
+            if (h.key && h.value) {
+                // Skip Content-Length as it's handled automatically
+                if (h.key.toLowerCase() !== 'content-length') {
+                    const escapedValue = h.value.replace(/"/g, '\\"');
+                    vroCode += `request.setHeader("${h.key}", "${escapedValue}");\n`;
+                }
+            }
         });
+    }
+
+    // Helper function to check if string is JSON
+    function isJsonString(str) {
+        try {
+            JSON.parse(str);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Add request body if present
+    if (postmanRequest.body) {
+        if (postmanRequest.body.mode === 'raw' && postmanRequest.body.raw) {
+            // Get content type from headers
+            const contentTypeHeader = headers.find(h => h.key.toLowerCase() === 'content-type');
+            const contentType = contentTypeHeader ? contentTypeHeader.value.toLowerCase() : '';
+            const body = postmanRequest.body.raw;
+            
+            // Handle different content types
+            if (contentType.includes('application/json') || isJsonString(body)) {
+                // Handle JSON content
+                const jsonBody = JSON.parse(body);
+                vroCode += '\n// Set JSON request body\nrequest.contentType = "application/json";\n';
+                vroCode += `request.content = JSON.stringify(${JSON.stringify(jsonBody, null, 2)});\n`;
+            } else if (contentType.includes('application/xml') || contentType.includes('text/xml') || 
+                      (contentType === '' && body.trim().startsWith('<'))) {
+                // Handle XML content
+                const xmlContent = body.replace(/`/g, '\\`'); // Escape backticks in XML
+                vroCode += `\n// Set XML request body\nrequest.contentType = "${contentType || 'application/xml'}";\n`;
+                vroCode += `request.content = \`${xmlContent}\`;\n`;
+            } else if (contentType === '*/*' || !contentType) {
+                // Handle wildcard or no content type
+                if (body.trim().startsWith('<')) {
+                    // Looks like XML
+                    const xmlContent = body.replace(/`/g, '\\`');
+                    vroCode += '\n// Set request body (inferred XML)\nrequest.contentType = "application/xml";\n';
+                    vroCode += `request.content = \`${xmlContent}\`;\n`;
+                } else if (isJsonString(body)) {
+                    // Try parsing as JSON
+                    const jsonBody = JSON.parse(body);
+                    vroCode += '\n// Set request body (inferred JSON)\nrequest.contentType = "application/json";\n';
+                    vroCode += `request.content = JSON.stringify(${JSON.stringify(jsonBody, null, 2)});\n`;
+                } else {
+                    // Default to text/plain
+                    const textContent = body.replace(/`/g, '\\`');
+                    vroCode += '\n// Set request body (default text)\nrequest.contentType = "text/plain";\n';
+                    vroCode += `request.content = \`${textContent}\`;\n`;
+                }
+            } else {
+                // Handle other content types as-is
+                const escapedContent = body.replace(/`/g, '\\`');
+                vroCode += `\n// Set ${contentType} request body\nrequest.contentType = "${contentType}";\n`;
+                vroCode += `request.content = \`${escapedContent}\`;\n`;
+            }
+        } else if (postmanRequest.body.mode === 'formdata' && postmanRequest.body.formdata) {
+            // Handle form data
+            vroCode += '\n// Set form data\n';
+            postmanRequest.body.formdata.forEach(item => {
+                if (item.key) {
+                    const value = item.value || '';
+                    vroCode += `request.addParameter("${item.key}", "${value}");\n`;
+                }
+            });
+        } else if (postmanRequest.body.mode === 'urlencoded' && postmanRequest.body.urlencoded) {
+            // Handle URL encoded form data
+            vroCode += '\n// Set URL encoded form data\n';
+            postmanRequest.body.urlencoded.forEach(item => {
+                if (item.key) {
+                    const value = item.value || '';
+                    vroCode += `request.addParameter("${item.key}", "${value}");\n`;
+                }
+            });
+        }
     }
 
     // Add execution code
@@ -194,16 +195,33 @@ var request = httpRestHost.createRequest("${method}", "${urlObj.pathname}${urlOb
 var response = request.execute();
 
 // Handle response
-if (response.statusCode == 200) {
+if (response.statusCode >= 200 && response.statusCode < 300) {
     System.log("Request successful");
-    var responseContent = JSON.parse(response.contentAsString);
-    System.log(JSON.stringify(responseContent));
+    try {
+        // Try to parse JSON response
+        var responseContent = JSON.parse(response.contentAsString);
+        System.log(JSON.stringify(responseContent, null, 2));
+        return responseContent;
+    } catch (e) {
+        // If not JSON, return as text
+        System.log(response.contentAsString);
+        return response.contentAsString;
+    }
 } else {
-    throw "Request failed with status: " + response.statusCode;
-}`;
+    var errorMessage = "Request failed with status: " + response.statusCode;
+    try {
+        // Try to include error details from response
+        var errorContent = JSON.parse(response.contentAsString);
+        errorMessage += " - " + (errorContent.message || errorContent.error || JSON.stringify(errorContent));
+    } catch (e) {
+        errorMessage += " - " + response.contentAsString;
+    }
+    throw errorMessage;
+}
+`;
 
-    // Add the original curl command as a comment at the end
-    vroCode += `\n\n/*\nOriginal curl command:\n${originalCurlCommand}\n*/`;
+    // Add the original curl command as a comment
+    vroCode += `\n/*\nOriginal curl command:\n${originalCurl}\n*/`;
 
     return vroCode;
 }
@@ -216,35 +234,69 @@ if (response.statusCode == 200) {
  */
 function convertCurlToVRO(curlCommand) {
     try {
-        const parsedCurl = parseCurlCommand(curlCommand);
-        
-        // Validate that we have a valid URL
-        if (!parsedCurl.url) {
-            throw new Error("URL not found in curl command");
+        // First validate the curl command
+        const validation = validate(curlCommand);
+        if (!validation.result) {
+            throw new Error(`Invalid curl command: ${validation.reason || 'Unknown error'}`);
         }
+
+        // Convert the curl command to Postman format synchronously
+        const result = convertSync(curlCommand);
         
-        const vroCode = generateVROCode(parsedCurl, curlCommand);
+        if (!result || !result.result || !result.output || !result.output[0]) {
+            throw new Error('Failed to convert curl command: Invalid response from converter');
+        }
+
+        const postmanRequest = result.output[0].data;
         
-        // Generate filename from URL and method
-        const urlObj = new URL(parsedCurl.url);
-        const sanitizedPath = urlObj.pathname.replace(/[\/:\*?"<>|]/g, '_');
-        const filename = `${urlObj.hostname}${sanitizedPath}_${parsedCurl.method}.js`;
+        // Generate vRO code from the Postman request
+        const vroCode = generateVROCode(postmanRequest, curlCommand);
         
-        // Write to file using Node.js fs module
-        const fs = require('fs');
+        // Generate a filename from the URL and method
+        const urlParts = postmanRequest.url;
+        let host, path;
+        
+        if (typeof urlParts === 'string') {
+            // For string URLs, ensure we have a protocol before creating URL object
+            const urlStr = urlParts.startsWith('http') ? urlParts : 'https://' + urlParts;
+            const urlObj = new URL(urlStr);
+            host = urlObj.hostname;
+            path = urlObj.pathname.replace(/[^a-zA-Z0-9]/g, '_');
+        } else {
+            host = urlParts.host ? urlParts.host.join('.') : 'request';
+            path = urlParts.path ? urlParts.path.join('_') : '';
+        }
+            
+        const filename = `${host}_${path}_${postmanRequest.method || 'get'}.js`
+            .replace(/_{2,}/g, '_')
+            .replace(/^_|_$/g, '');
+        
+        // Write to file
         fs.writeFileSync(filename, vroCode);
         console.log(`vRO code has been saved to ${filename}`);
         
         return vroCode;
     } catch (error) {
-        console.error("Error:", error.message);
-        throw new Error("Unsupported curl command. Curl2vRO fails to parse it properly. Please check the command.");
+        const errorMessage = `Failed to process curl command.\n` +
+            `This might be due to an unsupported curl command format. Please try the following steps:\n` +
+            `1. First convert your curl command using Postman's import feature:\n` +
+            `   https://learning.postman.com/docs/getting-started/importing-and-exporting/importing-curl-commands/\n` +
+            `2. Copy the simplified curl command from Postman and try again.\n\n` +
+            `Common issues with the current command:\n` +
+            `- Missing 'https://' or 'http://' prefix in URL\n` +
+            `- Complex quoting or escaping in the command\n` +
+            `- Unsupported curl options or parameters\n\n` +
+            `Original error: ${error.message}`;
+        
+        throw new Error(errorMessage);
     }
 }
 
-// Export the module with the new name
+// For backward compatibility
+const convertCurlToVROAsync = convertCurlToVRO;
+
+// Export the module
 module.exports = {
     convertCurlToVRO,
-    parseCurlCommand,
-    generateVROCode
+    convertCurlToVROAsync
 };

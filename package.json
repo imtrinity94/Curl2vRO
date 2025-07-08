@@ -1,0 +1,22 @@
+{
+  "name": "curl2vro",
+  "version": "2.0.0",
+  "description": "Convert curl commands to vRO JavaScript code",
+  "main": "curl2vRO.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "curl",
+    "vro",
+    "vrealize",
+    "orchestrator",
+    "converter"
+  ],
+  "author": "Mayank Goyal <mayankgoyalmax@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "curl-to-postmanv2": "^1.0.0",
+    "deasync": "^0.1.30"
+  }
+}
