@@ -6,7 +6,7 @@
  * @fileoverview Curl to vRO JavaScript Code Converter
  * @description A utility to convert curl commands to VMware vRealize Orchestrator (vRO) JavaScript code
  * @author Mayank Goyal <mayankgoyalmax@gmail.com>
- * @version 2.0.0
+ * @version 2.0.2
  * @license MIT
  */
 
@@ -55,6 +55,11 @@ function generateVROCode(postmanRequest, originalCurl) {
     if (!url) {
         throw new Error('No URL found in the request');
     }
+    
+    // Check for FTP protocol
+    if (url.toLowerCase().startsWith('ftp://')) {
+        throw new Error('FTP protocol is not supported. Please use HTTP or HTTPS.');
+    }
 
     // Parse URL to extract components
     let urlObj;
@@ -80,20 +85,24 @@ function generateVROCode(postmanRequest, originalCurl) {
  * @author curl2vRO (Mayank Goyal)
  */
 
+// Define URL components
+var targetUrl = "${urlObj.protocol}//${urlObj.host}${urlObj.pathname}${urlObj.search || ''}";
+var baseUrl = "${urlObj.protocol}//${urlObj.host}";
+
 // Accept SSL certificate
 var ld = Config.getKeystores().getImportCAFromUrlAction();
 var model = ld.getModel();
-model.value = "${urlObj.protocol}//${urlObj.host}";
+model.value = baseUrl;
 var error = ld.execute();
 if (error) {
-    throw new Error("Failed to accept certificate for URL: ${urlObj.protocol}//${urlObj.host}" + ". Error: " + error);
+    throw new Error("Failed to accept certificate for URL: " + baseUrl + ". Error: " + error);
 }
 
 // Create transient REST host
 var restHost = RESTHostManager.createHost("dynamicRequest");
 var httpRestHost = RESTHostManager.createTransientHostFrom(restHost);
 httpRestHost.operationTimeout = 600;
-httpRestHost.url = "${urlObj.protocol}//${urlObj.host}";
+httpRestHost.url = baseUrl;
 
 // Create REST request
 var request = httpRestHost.createRequest("${method.toUpperCase()}", "${urlObj.pathname}${urlObj.search || ''}");
@@ -227,12 +236,14 @@ if (response.statusCode >= 200 && response.statusCode < 300) {
 }
 
 /**
- * Converts a curl command to vRO JavaScript code and saves it to a file
+ * Converts a curl command to vRO JavaScript code
  * @param {string} curlCommand - The curl command to convert
+ * @param {Object} [options] - Conversion options
+ * @param {boolean} [options.writeToFile=false] - Whether to write the output to a file. Defaults to false for safety in read-only environments.
  * @returns {string} The generated vRO JavaScript code
  * @throws {Error} If the curl command cannot be parsed properly
  */
-function convertCurlToVRO(curlCommand) {
+function convertCurlToVRO(curlCommand, { writeToFile = false } = {}) {
     try {
         // First validate the curl command
         const validation = validate(curlCommand);
@@ -271,9 +282,15 @@ function convertCurlToVRO(curlCommand) {
             .replace(/_{2,}/g, '_')
             .replace(/^_|_$/g, '');
         
-        // Write to file
-        fs.writeFileSync(filename, vroCode);
-        console.log(`vRO code has been saved to ${filename}`);
+        // Write to file if enabled
+        if (writeToFile) {
+            try {
+                fs.writeFileSync(filename, vroCode);
+                console.log(`vRO code has been saved to ${filename}`);
+            } catch (error) {
+                console.warn(`Warning: Could not write to file '${filename}': ${error.message}. The code will still be returned.`);
+            }
+        }
         
         return vroCode;
     } catch (error) {
@@ -293,7 +310,9 @@ function convertCurlToVRO(curlCommand) {
 }
 
 // For backward compatibility
-const convertCurlToVROAsync = convertCurlToVRO;
+const convertCurlToVROAsync = (curlCommand, options) => {
+    return convertCurlToVRO(curlCommand, { ...options, writeToFile: false });
+};
 
 // Export the module
 module.exports = {

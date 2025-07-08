@@ -1,6 +1,6 @@
 {
   "name": "curl2vro",
-  "version": "2.0.0",
+  "version": "2.0.2",
   "description": "Convert curl commands to vRO JavaScript code",
   "main": "curl2vRO.js",
   "scripts": {

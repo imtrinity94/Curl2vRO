@@ -12,9 +12,14 @@ const curlCommand = `curl --location --request POST \
 
 try {
     // Convert to vRO code synchronously
-    const vroCode = convertCurlToVRO(curlCommand);
+    const options = { writeToFile: false };
+    const vroCode = convertCurlToVRO(curlCommand, options);
     console.log('Successfully generated vRO code!');
-    console.log('The code has been saved to a file (see console output for filename)');
+    console.log(vroCode);
+    if (options.writeToFile) {
+        console.log('The code has been saved to a file (see console output for filename)');
+    }
+    
 } catch (error) {
     console.error('Error:', error.message);
 }
