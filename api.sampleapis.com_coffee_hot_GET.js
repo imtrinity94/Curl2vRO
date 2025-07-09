@@ -1,8 +1,6 @@
 /**
  * @description Curl to vRO JavaScritpt converted code
  * @author curl2vRO
- * @version 1.0.0
- * @date 2025-05-04
  */
 
 // Accept SSL certificate
