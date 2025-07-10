@@ -7,6 +7,11 @@
 
 A utility to convert curl commands to VMware vRealize Orchestrator (vRO) JavaScript code.
 
+Available as an [npm package](https://www.npmjs.com/package/curl2vro) or a [webapp](https://curl2vro.vercel.app)
+
+<img width="767" height="437" alt="image" src="https://github.com/user-attachments/assets/28d0e9b5-02d5-4df4-8e12-5f58f09ce142" />
+
+
 ## Requirements
 
 - Node.js 14.x or higher
